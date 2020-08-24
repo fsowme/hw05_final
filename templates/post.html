@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %} Пользователь {% endblock %}
+{% block content %}
+
+<main role="main" class="container">
+    <div class="row">
+        {% include "include/author_card.html" %}
+        {% include "include/post_card.html" %}
+    </div>
+    {% include "include/comments.html" %}
+</main>
+{% endblock %}

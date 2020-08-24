@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load cache %}
+{% block title %} Последние обновления {% endblock %}
+{% block content %}
+
+<h1> Последние обновления на сайте</h1>
+
+{% cache 20 index_page %}
+<main role="main" class="container">
+    <div class="row">
+        <div class="col-md-9">
+            {% for post in page %}
+            {% include "include/post_card.html" %}
+            {% endfor %}
+            {% if page.has_other_pages %}
+            {% include "include/paginator.html" with items=page paginator=paginator %}
+            {% endif %}
+        </div>
+    </div>
+</main>
+{% endcache %}
+{% endblock %}

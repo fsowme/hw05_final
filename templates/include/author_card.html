@@ -1,0 +1,37 @@
+<div class="col-md-3 mb-3 mt-1">
+    <div class="card">
+        <div class="card-body">
+            <div class="h2">
+                {% if request.resolver_match.url_name == 'post' %}
+                {{ post.author.first_name }}
+                {% else %}
+                {{ author.first_name }}
+                {% endif %}
+            </div>
+            <div class="h3 text-muted">
+                {% if request.resolver_match.url_name == 'post' %}
+                @{{ post.author.username }}
+                {% else %}
+                @{{ author.username }}
+                {% endif %}
+            </div>
+        </div>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item">
+                <div class="h6 text-muted">
+                    Подписчиков: XXX <br />
+                    Подписан: XXX
+                </div>
+            </li>
+            <li class="list-group-item">
+                <div class="h6 text-muted">
+                    {% if request.resolver_match.url_name == 'post' %}
+                    Записей: {{ author_posts_cnt }}
+                    {% else %}
+                    Записей: {{ paginator.count }}
+                    {% endif %}
+                </div>
+            </li>
+        </ul>
+    </div>
+</div>
