@@ -2,18 +2,10 @@
     <div class="card">
         <div class="card-body">
             <div class="h2">
-                {% if request.resolver_match.url_name == 'post' %}
-                {{ post.author.first_name }}
-                {% else %}
                 {{ author.first_name }}
-                {% endif %}
             </div>
             <div class="h3 text-muted">
-                {% if request.resolver_match.url_name == 'post' %}
-                @{{ post.author.username }}
-                {% else %}
                 @{{ author.username }}
-                {% endif %}
             </div>
         </div>
         <ul class="list-group list-group-flush">
@@ -31,6 +23,17 @@
                     Записей: {{ paginator.count }}
                     {% endif %}
                 </div>
+            </li>
+            <li class="list-group-item">
+                {% if following %}
+                <a class="btn btn-lg btn-light" href="{% url 'profile_unfollow' author.username %}" role="button">
+                    Отписаться
+                </a>
+                {% else %}
+                <a class="btn btn-lg btn-primary" href="{% url 'profile_follow' author.username %}" role="button">
+                    Подписаться
+                </a>
+                {% endif %}
             </li>
         </ul>
     </div>

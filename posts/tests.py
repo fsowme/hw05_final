@@ -164,3 +164,9 @@ class TestCache(TestCase):
             "MyTestText111",
             msg_prefix="Created post is not on index page",
         )
+
+    def test_1(self):
+        self.cl.force_login(self.user)
+        resp = self.cl.get(reverse("follow_index"))
+
+        print(resp.context)
