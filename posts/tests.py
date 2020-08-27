@@ -22,6 +22,13 @@ class TestPostsApp(TestCase):
         self.user = User.objects.create(
             username="mytestuser", password="mytestpass", email="test@test.ru"
         )
+
+        self.author = User.objects.create(
+            username="mytestauthor",
+            password="secondtestpass",
+            email="author@test.ru",
+        )
+
         self.group = Group.objects.create(
             slug="testslug", title="mytestgroup", description="testdescr"
         )
@@ -130,15 +137,15 @@ class TestPostsApp(TestCase):
     def test_grouppage_with_image(self):
         file = "posts/files_on_test/test_image.jpg"
         upload_file_at_post_edit(self.cl_auth, self.group, file)
-        response = self.cl.get(
-            reverse("name_group", kwargs={"slug": "testslug"})
-        )
+        response = self.cl.get(reverse("group", kwargs={"slug": "testslug"}))
         self.assertIn("img", response.content.decode())
 
     def test_upload_not_image(self):
         file = "posts/files_on_test/test_textfile.txt"
         response = upload_file_at_post_edit(self.cl_auth, self.group, file)
         self.assertIsNone(self.post.image.name)
+
+    # def test_auth_user_follow(self):
 
 
 class TestCache(TestCase):
@@ -165,8 +172,3 @@ class TestCache(TestCase):
             msg_prefix="Created post is not on index page",
         )
 
-    def test_1(self):
-        self.cl.force_login(self.user)
-        resp = self.cl.get(reverse("follow_index"))
-
-        print(resp.context)

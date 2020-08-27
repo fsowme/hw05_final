@@ -57,6 +57,10 @@ def profile(request, username):
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
     each_post_comments = count_post_comments(page)
+    follow = bool(
+        request.user.is_authenticated
+        and Follow.objects.filter(author=author, user=request.user).exists()
+    )
     return render(
         request,
         "profile.html",
@@ -66,6 +70,7 @@ def profile(request, username):
             "can_edit": can_edit,
             "author": author,
             "each_post_comments": each_post_comments,
+            "following": follow,
         },
     )
 
@@ -127,6 +132,12 @@ def post_view(request, username, post_id):
     comment_form = CommentForm()
     post_comments = post.comments.all()
     post_comments_cnt = post.comments.count()
+    follow = bool(
+        request.user.is_authenticated
+        and Follow.objects.filter(
+            author=post.author, user=request.user
+        ).exists()
+    )
     return render(
         request,
         "post.html",
@@ -138,6 +149,7 @@ def post_view(request, username, post_id):
             "form": comment_form,
             "post_comments": post_comments,
             "post_comments_cnt": post_comments_cnt,
+            "following": follow,
         },
     )
 
@@ -176,16 +188,20 @@ def follow_index(request):
 @login_required
 def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
-    follow = Follow.objects.create(user=request.user, author=author)
-    return redirect("follow_index")
+    page_with_button = request.META.get("HTTP_REFERER", "index")
+    if not Follow.objects.filter(user=request.user, author=author).exists():
+        follow = Follow.objects.create(user=request.user, author=author)
+    return redirect(page_with_button)
 
 
 @login_required
 def profile_unfollow(request, username):
     author = get_object_or_404(User, username=username)
-    follow_for_delete = Follow.objects.get(author=username, user=request.user)
-    follow_for_delete.delete()
-    return redirect("index")
+    page_with_button = request.META.get("HTTP_REFERER", "index")
+    followings = Follow.objects.filter(user=request.user, author=author)
+    if followings.exists():
+        followings.delete()
+    return redirect(page_with_button)
 
 
 def page_not_found(request, exception):
