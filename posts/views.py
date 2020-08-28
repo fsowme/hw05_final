@@ -20,7 +20,7 @@ def count_post_comments(page):
     return comments_in_post
 
 
-# @cache_page(20, key_prefix="index_page")
+@cache_page(20, key_prefix="index_page")
 def index(request):
     post_list = Post.objects.all()
     paginator = Paginator(post_list, 10)
@@ -155,25 +155,22 @@ def post_view(request, username, post_id):
 
 
 @login_required
-# @cache_page(20, key_prefix="follow_page")
+@cache_page(20, key_prefix="follow_page")
 def follow_index(request):
-    user_followings = Follow.objects.select_related("author").filter(
+
+    user_followings = Follow.objects.prefetch_related("author__posts").filter(
         user=request.user
     )
-    user_following_posts = user_followings[:1].get().author.posts.all()
+    posts = Post.objects.none()
+    for follow in user_followings:
+        posts = chain(posts, follow.author.posts.all())
+    posts = sorted(posts, key=attrgetter("pub_date"), reverse=True)
 
-    for follow in user_followings[1:]:
-        user_following_posts = chain(
-            user_following_posts, follow.author.posts.all()
-        )
-    user_following_posts = sorted(
-        user_following_posts, key=attrgetter("pub_date"), reverse=True
-    )
-
-    paginator = Paginator(user_following_posts, 10)
+    paginator = Paginator(posts, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
     each_post_comments = count_post_comments(page)
+
     return render(
         request,
         "follow_index.html",

@@ -2,7 +2,7 @@ from django.core.cache import cache
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from posts.models import Group, Post, User
+from posts.models import Follow, Group, Post, User
 
 
 def upload_file_at_post_edit(browser, group, path_to_file):
@@ -22,7 +22,11 @@ class TestPostsApp(TestCase):
         self.user = User.objects.create(
             username="mytestuser", password="mytestpass", email="test@test.ru"
         )
-
+        self.second_user = User.objects.create(
+            username="secondtestuser",
+            password="secondtestpass",
+            email="second@test.ru",
+        )
         self.author = User.objects.create(
             username="mytestauthor",
             password="secondtestpass",
@@ -35,9 +39,15 @@ class TestPostsApp(TestCase):
         self.post = Post.objects.create(
             text="MyTestText", author=self.user, group=self.group
         )
+        self.author_post = Post.objects.create(
+            text="AuthorsText", author=self.author
+        )
+
         self.cl = Client()
         self.cl_auth = Client()
         self.cl_auth.force_login(self.user)
+
+        cache.clear()
 
     def test_profile_page(self):
         response = self.cl.get(
@@ -74,7 +84,7 @@ class TestPostsApp(TestCase):
         )
         self.assertContains(response, self.post)
 
-    def test_can_edit(self):
+    def test_can_edit_post(self):
         response = self.cl_auth.post(
             reverse(
                 "post_edit", kwargs={"username": "mytestuser", "post_id": 1}
@@ -145,7 +155,52 @@ class TestPostsApp(TestCase):
         response = upload_file_at_post_edit(self.cl_auth, self.group, file)
         self.assertIsNone(self.post.image.name)
 
-    # def test_auth_user_follow(self):
+    def test_auth_user_follow(self):
+        self.cl_auth.post(
+            reverse("profile_follow", kwargs={"username": "mytestauthor"})
+        )
+        self.assertTrue(
+            Follow.objects.filter(author=self.author, user=self.user).exists(),
+            msg="Subscribe doesn't exist",
+        )
+
+        self.cl_auth.post(
+            reverse("profile_unfollow", kwargs={"username": "mytestauthor"})
+        )
+        self.assertFalse(
+            Follow.objects.filter(author=self.author, user=self.user).exists(),
+            msg="Subscribe hasn't deletet",
+        )
+
+    def test_follower_sees_post(self):
+        Follow.objects.create(author=self.author, user=self.user)
+        follower_response = self.cl_auth.get(reverse("follow_index"))
+        self.assertContains(follower_response, self.author_post)
+
+        cache.clear()
+
+        self.cl_auth.force_login(self.second_user)
+        not_follower_response = self.cl_auth.get(reverse("follow_index"))
+        self.assertNotContains(not_follower_response, self.author_post)
+
+    def test_auth_user_comment(self):
+        response = self.cl.post(
+            reverse(
+                "add_comment", kwargs={"username": "mytestuser", "post_id": 1}
+            ),
+            {"text": "TestComment"},
+            follow=True,
+        )
+        self.assertFalse(self.post.comments.exists())
+
+        response = self.cl_auth.post(
+            reverse(
+                "add_comment", kwargs={"username": "mytestuser", "post_id": 1}
+            ),
+            {"text": "TestComment"},
+            follow=True,
+        )
+        self.assertTrue(self.post.comments.exists())
 
 
 class TestCache(TestCase):
