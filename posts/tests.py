@@ -203,6 +203,7 @@ class TestPostsApp(TestCase):
         self.assertTrue(self.post.comments.exists())
 
 
+
 class TestCache(TestCase):
     def setUp(self):
         self.user = User.objects.create(
