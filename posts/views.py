@@ -167,9 +167,7 @@ def post_view(request, username, post_id):
 
 
 @login_required
-@cache_page(20, key_prefix="follow_page")
 def follow_index(request):
-
     user_followings = Follow.objects.prefetch_related("author__posts").filter(
         user=request.user
     )
