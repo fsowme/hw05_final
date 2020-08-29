@@ -20,6 +20,12 @@ def count_post_comments(page):
     return comments_in_post
 
 
+def count_follow(man):
+    following = Follow.objects.filter(author=man).count()
+    follower = Follow.objects.filter(user=man).count()
+    return following, follower
+
+
 @cache_page(20, key_prefix="index_page")
 def index(request):
     post_list = Post.objects.all()
@@ -61,6 +67,7 @@ def profile(request, username):
         request.user.is_authenticated
         and Follow.objects.filter(author=author, user=request.user).exists()
     )
+    following_count, follower_count = count_follow(author)
     return render(
         request,
         "profile.html",
@@ -71,6 +78,8 @@ def profile(request, username):
             "author": author,
             "each_post_comments": each_post_comments,
             "following": follow,
+            "following_count": following_count,
+            "follower_count": follower_count,
         },
     )
 
@@ -138,6 +147,7 @@ def post_view(request, username, post_id):
             author=post.author, user=request.user
         ).exists()
     )
+    following_count, follower_count = count_follow(post.author)
     return render(
         request,
         "post.html",
@@ -150,6 +160,8 @@ def post_view(request, username, post_id):
             "post_comments": post_comments,
             "post_comments_cnt": post_comments_cnt,
             "following": follow,
+            "following_count": following_count,
+            "follower_count": follower_count,
         },
     )
 
@@ -186,6 +198,8 @@ def follow_index(request):
 def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
     page_with_button = request.META.get("HTTP_REFERER", "index")
+    if author == request.user:
+        return redirect(page_with_button)
     if not Follow.objects.filter(user=request.user, author=author).exists():
         follow = Follow.objects.create(user=request.user, author=author)
     return redirect(page_with_button)

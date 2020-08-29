@@ -1,6 +1,8 @@
 {% extends "base.html" %}
-{% block title %}Записи сообщества {{ group.title }} {% endblock %}
-{%block content%} <p>{{group.description}}</p>
+{% block title %}Записи сообщества {{ group.title }}{% endblock %}
+{%block content%}
+<h1>{{ group.title }}</h1>
+<p>{{group.description}}</p>
 
 <main role="main" class="container">
     <div class="row">
