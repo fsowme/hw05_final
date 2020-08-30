@@ -9,8 +9,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.cache import cache_page
 
-from .forms import CommentForm, NewPostForm
-from .models import Follow, Group, Post, User
+from posts.forms import CommentForm, NewPostForm
+from posts.models import Follow, Group, Post, User
 
 
 def count_post_comments(page):
@@ -21,8 +21,8 @@ def count_post_comments(page):
 
 
 def count_follow(man):
-    following = Follow.objects.filter(author=man).count()
-    follower = Follow.objects.filter(user=man).count()
+    following = man.following.count()
+    follower = man.follower.count()
     return following, follower
 
 
@@ -47,7 +47,7 @@ def index(request):
 @login_required
 def new_post(request):
     post_form = NewPostForm(request.POST or None, files=request.FILES or None)
-    if request.method == "POST" and post_form.is_valid():
+    if post_form.is_valid():
         instance_form = post_form.save(commit=False)
         instance_form.author = request.user
         instance_form.save()
@@ -93,7 +93,7 @@ def post_edit(request, username, post_id):
     if request.user != post.author:
         return redirect("post", username=username, post_id=post_id)
 
-    if request.method == "POST" and post_form.is_valid():
+    if post_form.is_valid():
         post_form.author = request.user
         post_form.save()
         return redirect("post", username=username, post_id=post_id)
@@ -124,7 +124,7 @@ def group_posts(request, slug):
 def add_comment(request, username, post_id):
     post = get_object_or_404(Post, author__username=username, id=post_id)
     comment_form = CommentForm(request.POST or None)
-    if request.method == "POST" and comment_form.is_valid:
+    if comment_form.is_valid:
         instance_comment = comment_form.save(commit=False)
         instance_comment.post = post
         instance_comment.author = request.user
@@ -168,15 +168,12 @@ def post_view(request, username, post_id):
 
 @login_required
 def follow_index(request):
-    user_followings = Follow.objects.prefetch_related("author__posts").filter(
-        user=request.user
+    # Как же я долго искал это.... из-за него затянул весь спринт
+    favorites_authors_posts = Post.objects.filter(
+        author__following__user=request.user
     )
-    posts = Post.objects.none()
-    for follow in user_followings:
-        posts = chain(posts, follow.author.posts.all())
-    posts = sorted(posts, key=attrgetter("pub_date"), reverse=True)
 
-    paginator = Paginator(posts, 10)
+    paginator = Paginator(favorites_authors_posts, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
     each_post_comments = count_post_comments(page)
@@ -195,22 +192,22 @@ def follow_index(request):
 @login_required
 def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
-    page_with_button = request.META.get("HTTP_REFERER", "index")
+    previous_page = request.META.get("HTTP_REFERER", "index")
     if author == request.user:
-        return redirect(page_with_button)
+        return redirect(previous_page)
     if not Follow.objects.filter(user=request.user, author=author).exists():
         follow = Follow.objects.create(user=request.user, author=author)
-    return redirect(page_with_button)
+    return redirect(previous_page)
 
 
 @login_required
 def profile_unfollow(request, username):
     author = get_object_or_404(User, username=username)
-    page_with_button = request.META.get("HTTP_REFERER", "index")
+    previous_page = request.META.get("HTTP_REFERER", "index")
     followings = Follow.objects.filter(user=request.user, author=author)
     if followings.exists():
         followings.delete()
-    return redirect(page_with_button)
+    return redirect(previous_page)
 
 
 def page_not_found(request, exception):

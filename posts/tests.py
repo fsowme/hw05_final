@@ -1,46 +1,38 @@
+from io import BytesIO
+
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client, TestCase
 from django.urls import reverse
+from PIL import Image
 
 from posts.models import Follow, Group, Post, User
 
 
-def upload_file_at_post_edit(browser, group, path_to_file):
-    with open(path_to_file, "rb") as img:
-        response = browser.post(
-            reverse(
-                "post_edit", kwargs={"username": "mytestuser", "post_id": 1},
-            ),
-            {"text": "post with image", "image": img, "group": group.pk},
-            follow=True,
-        )
-        return response
+def make_post_with_image(self):
+    container_for_img = BytesIO()
+    img = Image.new("RGB", (100, 100), "red")
+    img.save(container_for_img, format="JPEG")
+    bin_image = container_for_img.getvalue()
+    img = SimpleUploadedFile(
+        name="test_image.jpg", content=bin_image, content_type="image/jpg"
+    )
+    post = Post.objects.create(
+        author=self.user, text="testtext", image=img, group=self.group
+    )
+    return post
 
 
 class TestPostsApp(TestCase):
     def setUp(self):
-        self.user = User.objects.create(
-            username="mytestuser", password="mytestpass", email="test@test.ru"
+        self.user = User.objects.create_user(
+            "mytestuser", "test@test.ru", "mytestpass"
         )
-        self.second_user = User.objects.create(
-            username="secondtestuser",
-            password="secondtestpass",
-            email="second@test.ru",
-        )
-        self.author = User.objects.create(
-            username="mytestauthor",
-            password="secondtestpass",
-            email="author@test.ru",
-        )
-
         self.group = Group.objects.create(
             slug="testslug", title="mytestgroup", description="testdescr"
         )
         self.post = Post.objects.create(
             text="MyTestText", author=self.user, group=self.group
-        )
-        self.author_post = Post.objects.create(
-            text="AuthorsText", author=self.author
         )
 
         self.cl = Client()
@@ -60,9 +52,7 @@ class TestPostsApp(TestCase):
             reverse("new_post"), {"text": "MyTestText2"}, follow=True
         )
         post_id = response.context["page"].object_list[0].id
-        self.assertIn(
-            Post.objects.get(id=post_id), Post.objects.all(),
-        )
+        self.assertIsNotNone(Post.objects.get(id=post_id))
 
     def test_createpost_guest(self):
         response = self.cl.post(reverse("new_post"), {"text": "MyTestText"},)
@@ -123,76 +113,110 @@ class TestPostsApp(TestCase):
         self.assertEqual(response.status_code, 404)
 
     def test_postpage_with_image(self):
-        file = "posts/files_on_test/test_image.jpg"
-        upload_file_at_post_edit(self.cl_auth, self.group, file)
+        post = make_post_with_image(self)
         response = self.cl.get(
-            reverse("post", kwargs={"username": "mytestuser", "post_id": 1})
+            reverse(
+                "post", kwargs={"username": "mytestuser", "post_id": post.id},
+            )
         )
         self.assertIn("img", response.content.decode())
 
     def test_indexpage_with_image(self):
-        file = "posts/files_on_test/test_image.jpg"
-        upload_file_at_post_edit(self.cl_auth, self.group, file)
+        make_post_with_image(self)
         response = self.cl.get(reverse("index"))
         self.assertIn("img", response.content.decode())
 
     def test_profilepage_with_image(self):
-        file = "posts/files_on_test/test_image.jpg"
-        upload_file_at_post_edit(self.cl_auth, self.group, file)
+        make_post_with_image(self)
         response = self.cl.get(
             reverse("profile", kwargs={"username": "mytestuser"})
         )
         self.assertIn("img", response.content.decode())
 
     def test_grouppage_with_image(self):
-        file = "posts/files_on_test/test_image.jpg"
-        upload_file_at_post_edit(self.cl_auth, self.group, file)
+        make_post_with_image(self)
         response = self.cl.get(reverse("group", kwargs={"slug": "testslug"}))
         self.assertIn("img", response.content.decode())
 
     def test_upload_not_image(self):
-        file = "posts/files_on_test/test_textfile.txt"
-        response = upload_file_at_post_edit(self.cl_auth, self.group, file)
-        self.assertIsNone(self.post.image.name)
+        text_file = SimpleUploadedFile(
+            name="textfile.txt", content=b"TestTextInFile",
+        )
+        response = self.cl_auth.post(
+            reverse(
+                "post_edit",
+                kwargs={"username": "mytestuser", "post_id": self.post.id},
+            ),
+            {
+                "text": "PostWithTextFile",
+                "image": text_file,
+                "group": self.group.pk,
+            },
+        )
+        error_mesage = (
+            "Загрузите правильное изображение. Файл, который вы загрузили, "
+            "поврежден или не является изображением."
+        )
+        self.assertFormError(
+            response, "form", "image", errors=error_mesage,
+        )
 
     def test_auth_user_follow(self):
-        self.cl_auth.post(
-            reverse("profile_follow", kwargs={"username": "mytestauthor"})
+        author = User.objects.create_user(
+            "seconduser", "su@test.ru", "seconduserpass"
         )
+        self.cl_auth.post(
+            reverse("profile_follow", kwargs={"username": "seconduser"})
+        )
+
         self.assertTrue(
-            Follow.objects.filter(author=self.author, user=self.user).exists(),
+            Follow.objects.filter(author=author, user=self.user).exists(),
             msg="Subscribe doesn't exist",
         )
 
+    def test_auth_user_unfollow(self):
+        author = User.objects.create_user(
+            "seconduser", "su@test.ru", "seconduserpass"
+        )
         self.cl_auth.post(
             reverse("profile_unfollow", kwargs={"username": "mytestauthor"})
         )
         self.assertFalse(
-            Follow.objects.filter(author=self.author, user=self.user).exists(),
-            msg="Subscribe hasn't deletet",
+            Follow.objects.filter(author=author, user=self.user).exists(),
+            msg="Subscribe hasn't deleted",
         )
 
     def test_follower_sees_post(self):
-        Follow.objects.create(author=self.author, user=self.user)
+        author = User.objects.create_user(
+            "seconduser", "su@test.ru", "seconduserpass"
+        )
+        author_post = Post.objects.create(text="testtext", author=author)
+
+        Follow.objects.create(author=author, user=self.user)
         follower_response = self.cl_auth.get(reverse("follow_index"))
-        self.assertContains(follower_response, self.author_post)
+        self.assertContains(follower_response, author_post)
 
-        cache.clear()
+    def test_not_follower_sees_post(self):
+        author = User.objects.create_user(
+            "seconduser", "su@test.ru", "seconduserpass"
+        )
+        author_post = Post.objects.create(text="testtext", author=author)
 
-        self.cl_auth.force_login(self.second_user)
         not_follower_response = self.cl_auth.get(reverse("follow_index"))
-        self.assertNotContains(not_follower_response, self.author_post)
+        self.assertNotContains(not_follower_response, author_post)
 
-    def test_auth_user_comment(self):
+    def test_guest_cant_comment(self):
         response = self.cl.post(
             reverse(
-                "add_comment", kwargs={"username": "mytestuser", "post_id": 1}
+                "add_comment",
+                kwargs={"username": "mytestuser", "post_id": self.post.id},
             ),
             {"text": "TestComment"},
             follow=True,
         )
         self.assertFalse(self.post.comments.exists())
 
+    def test_authuser_can_comment(self):
         response = self.cl_auth.post(
             reverse(
                 "add_comment", kwargs={"username": "mytestuser", "post_id": 1}
@@ -205,8 +229,8 @@ class TestPostsApp(TestCase):
 
 class TestCache(TestCase):
     def setUp(self):
-        self.user = User.objects.create(
-            username="mytestuser", password="mytestpass", email="test@test.ru"
+        self.user = User.objects.create_user(
+            "mytestuser", "test@test.ru", "mytestpass"
         )
         self.cl = Client()
 
@@ -219,11 +243,3 @@ class TestCache(TestCase):
             "MyTestText111",
             msg_prefix="Cache is not working, created post on index page",
         )
-        cache.clear()
-        resp = self.cl.get(reverse("index"))
-        self.assertContains(
-            resp,
-            "MyTestText111",
-            msg_prefix="Created post is not on index page",
-        )
-
