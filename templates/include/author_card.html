@@ -11,23 +11,19 @@
         <ul class="list-group list-group-flush">
             <li class="list-group-item">
                 <div class="h6 text-muted">
-                    Подписчиков: {{ following_count }} <br />
-                    Подписан: {{ follower_count }}
+                    Подписчиков: {{ additional_context.following_count }} <br />
+                    Подписан: {{ additional_context.follower_count }}
                 </div>
             </li>
             <li class="list-group-item">
                 <div class="h6 text-muted">
-                    {% if request.resolver_match.url_name == 'post' %}
-                    Записей: {{ author_posts_cnt }}
-                    {% else %}
-                    Записей: {{ paginator.count }}
-                    {% endif %}
+                    Записей: {{ additional_context.author_posts_cnt }}
                 </div>
             </li>
             {% if request.user.is_authenticated %}
             <li class="list-group-item">
 
-                {% if following %}
+                {% if additional_context.following %}
                 <a class="btn btn-lg btn-light" href="{% url 'profile_unfollow' author.username %}" role="button">
                     Отписаться
                 </a>

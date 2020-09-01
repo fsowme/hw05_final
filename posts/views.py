@@ -4,26 +4,99 @@ from operator import attrgetter
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db.models import Count
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.cache import cache_page
 
 from posts.forms import CommentForm, NewPostForm
-from posts.models import Follow, Group, Post, User
+from posts.models import Comment, Follow, Group, Post, User
 
+# Идея казалась хорошей, пока я не воплотил её
+# в какого-то монстра Франкенштейна.
+# Извиняюсь за никакой английский.
+def check_states(**kwargs):
+    """ Can use this function to make additional context.
+    
+    Function returns dict "result_all_checks", values of this dict
+    are different objects for make context.
 
-def count_post_comments(page):
-    comments_in_post = {}
-    for post in page:
-        comments_in_post[post.id] = post.comments.count()
-    return comments_in_post
+    Available keyword arguments:
 
+    post - available value only is Post object. Will write to
+    dictionary all comments and number of comments.
+    
+    count_author_posts - boolean. If True, then "author" argument is
+    required. Author argument must be an object of model "Author". Will
+    write to dictionary number posts by author.
 
-def count_follow(man):
-    following = man.following.count()
-    follower = man.follower.count()
-    return following, follower
+    count_comments - available value any iterable object with Post 
+    model objects inside. Will write to dictionary number comments of
+    each post.
+
+    is_editable - boolean. If True, then arguments "author" and "user"
+    required. Will write to dictionary boolean type, if True its mean
+    user is the author and he can edit post.
+
+    is_following - boolean. If True, then arguments "author" and "user"
+    required. Will write to dictionary boolean type, if True its mean
+    user is already has a subscription to author.
+
+    count_followings - boolean. If True, then argument "author" is
+    required. Will write to dictionary 2 records, first with number of
+    followings, second with number of followers.
+
+    """
+    result_all_checks = {}
+    if "post" in kwargs:
+        post = kwargs["post"]
+        post_comments = post.comments.all()
+        post_comments_cnt = post.comments.count()
+        result_all_checks["post_comments"] = post_comments
+        result_all_checks["post_comments_cnt"] = post_comments_cnt
+
+    if "count_author_posts" in kwargs:
+        author = kwargs["author"]
+        author_posts_cnt = author.posts.count()
+        result_all_checks["author_posts_cnt"] = author_posts_cnt
+
+    if "count_comments" in kwargs:
+        posts = kwargs["count_comments"]
+        all_comments = (
+            Comment.objects.values("post")
+            .filter(post__in=posts)
+            .annotate(total=Count("id"))
+        )
+        total_comments = {}
+        for post_comments in all_comments:
+            total_comments[post_comments["post"]] = post_comments["total"]
+
+        result_all_checks["total_comments"] = total_comments
+
+    if "is_editable" in kwargs:
+        user = kwargs["user"]
+        author = kwargs["author"]
+        can_edit = bool(user.is_authenticated and user == author)
+        result_all_checks["editable"] = can_edit
+
+    if "is_following" in kwargs:
+        user = kwargs["user"]
+        author = kwargs["author"]
+        following = bool(
+            user.is_authenticated
+            and Follow.objects.filter(author=author, user=user).exists()
+        )
+        result_all_checks["following"] = following
+
+    if "count_followings" in kwargs:
+        author = kwargs["author"]
+        following = author.following.count()
+        follower = author.follower.count()
+        result_all_checks["following_count"] = following
+        result_all_checks["follower_count"] = follower
+
+    return result_all_checks
 
 
 @cache_page(20, key_prefix="index_page")
@@ -32,14 +105,108 @@ def index(request):
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
-    each_post_comments = count_post_comments(page)
+    additional_context = check_states(count_comments=page)
     return render(
         request,
         "index.html",
         {
             "page": page,
             "paginator": paginator,
-            "each_post_comments": each_post_comments,
+            "additional_context": additional_context,
+        },
+    )
+
+
+@login_required
+def follow_index(request):
+    # Как же я долго искал это.... из-за него затянул весь спринт
+    favorites_authors_posts = Post.objects.filter(
+        author__following__user=request.user
+    )
+
+    paginator = Paginator(favorites_authors_posts, 10)
+    page_number = request.GET.get("page")
+    page = paginator.get_page(page_number)
+    additional_context = check_states(count_comments=page)
+
+    return render(
+        request,
+        "follow_index.html",
+        {
+            "page": page,
+            "paginator": paginator,
+            "additional_context": additional_context,
+        },
+    )
+
+
+def profile(request, username):
+    author = get_object_or_404(User, username=username)
+    author_posts = author.posts.all()
+    paginator = Paginator(author_posts, 10)
+    page_number = request.GET.get("page")
+    page = paginator.get_page(page_number)
+    additional_context = check_states(
+        count_followings=True,
+        count_author_posts=True,
+        is_following=True,
+        is_editable=True,
+        user=request.user,
+        author=author,
+        count_comments=page,
+    )
+    return render(
+        request,
+        "profile.html",
+        {
+            "page": page,
+            "paginator": paginator,
+            "author": author,
+            "additional_context": additional_context,
+        },
+    )
+
+
+def post_view(request, username, post_id):
+    post = get_object_or_404(Post, author__username=username, id=post_id)
+    author_posts_cnt = post.author.posts.count()
+    comment_form = CommentForm()
+    additional_context = check_states(
+        count_followings=True,
+        count_author_posts=True,
+        is_following=True,
+        is_editable=True,
+        post=post,
+        author=post.author,
+        user=request.user,
+    )
+    return render(
+        request,
+        "post.html",
+        {
+            "post": post,
+            "author": post.author,
+            "form": comment_form,
+            "additional_context": additional_context,
+        },
+    )
+
+
+def group_posts(request, slug):
+    group = get_object_or_404(Group, slug=slug)
+    posts_in_group = group.posts.all()
+    paginator = Paginator(posts_in_group, 10)
+    page_number = request.GET.get("page")
+    page = paginator.get_page(page_number)
+    additional_context = check_states(count_comments=page)
+    return render(
+        request,
+        "group.html",
+        {
+            "page": page,
+            "paginator": paginator,
+            "group": group,
+            "additional_context": additional_context,
         },
     )
 
@@ -53,35 +220,6 @@ def new_post(request):
         instance_form.save()
         return redirect("index")
     return render(request, "new_post.html", {"form": post_form})
-
-
-def profile(request, username):
-    author = get_object_or_404(User, username=username)
-    can_edit = bool(request.user.is_authenticated and request.user == author)
-    author_posts = author.posts.all()
-    paginator = Paginator(author_posts, 10)
-    page_number = request.GET.get("page")
-    page = paginator.get_page(page_number)
-    each_post_comments = count_post_comments(page)
-    follow = bool(
-        request.user.is_authenticated
-        and Follow.objects.filter(author=author, user=request.user).exists()
-    )
-    following_count, follower_count = count_follow(author)
-    return render(
-        request,
-        "profile.html",
-        {
-            "page": page,
-            "paginator": paginator,
-            "can_edit": can_edit,
-            "author": author,
-            "each_post_comments": each_post_comments,
-            "following": follow,
-            "following_count": following_count,
-            "follower_count": follower_count,
-        },
-    )
 
 
 @login_required
@@ -101,25 +239,6 @@ def post_edit(request, username, post_id):
     return render(request, "new_post.html", {"form": post_form, "post": post})
 
 
-def group_posts(request, slug):
-    group = get_object_or_404(Group, slug=slug)
-    posts_in_group = group.posts.all()
-    paginator = Paginator(posts_in_group, 10)
-    page_number = request.GET.get("page")
-    page = paginator.get_page(page_number)
-    each_post_comments = count_post_comments(page)
-    return render(
-        request,
-        "group.html",
-        {
-            "page": page,
-            "paginator": paginator,
-            "group": group,
-            "each_post_comments": each_post_comments,
-        },
-    )
-
-
 @login_required
 def add_comment(request, username, post_id):
     post = get_object_or_404(Post, author__username=username, id=post_id)
@@ -130,63 +249,6 @@ def add_comment(request, username, post_id):
         instance_comment.author = request.user
         instance_comment.save()
     return redirect("post", username=username, post_id=post_id)
-
-
-def post_view(request, username, post_id):
-    post = get_object_or_404(Post, author__username=username, id=post_id)
-    author_posts_cnt = post.author.posts.count()
-    can_edit = bool(
-        request.user.is_authenticated and request.user == post.author
-    )
-    comment_form = CommentForm()
-    post_comments = post.comments.all()
-    post_comments_cnt = post.comments.count()
-    follow = bool(
-        request.user.is_authenticated
-        and Follow.objects.filter(
-            author=post.author, user=request.user
-        ).exists()
-    )
-    following_count, follower_count = count_follow(post.author)
-    return render(
-        request,
-        "post.html",
-        {
-            "can_edit": can_edit,
-            "post": post,
-            "author": post.author,
-            "author_posts_cnt": author_posts_cnt,
-            "form": comment_form,
-            "post_comments": post_comments,
-            "post_comments_cnt": post_comments_cnt,
-            "following": follow,
-            "following_count": following_count,
-            "follower_count": follower_count,
-        },
-    )
-
-
-@login_required
-def follow_index(request):
-    # Как же я долго искал это.... из-за него затянул весь спринт
-    favorites_authors_posts = Post.objects.filter(
-        author__following__user=request.user
-    )
-
-    paginator = Paginator(favorites_authors_posts, 10)
-    page_number = request.GET.get("page")
-    page = paginator.get_page(page_number)
-    each_post_comments = count_post_comments(page)
-
-    return render(
-        request,
-        "follow_index.html",
-        {
-            "page": page,
-            "paginator": paginator,
-            "each_post_comments": each_post_comments,
-        },
-    )
 
 
 @login_required

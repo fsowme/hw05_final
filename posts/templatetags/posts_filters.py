@@ -11,4 +11,10 @@ def addclass(field, css):
 
 @register.filter
 def get_value_from_dict(dictionary, key):
+
     return dictionary.get(key)
+
+
+@register.filter
+def get_value_from_list(list, position):
+    return list[position]
