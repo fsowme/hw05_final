@@ -120,7 +120,6 @@ def index(request):
 
 @login_required
 def follow_index(request):
-    # Как же я долго искал это.... из-за него затянул весь спринт
     favorites_authors_posts = Post.objects.filter(
         author__following__user=request.user
     )
@@ -172,6 +171,8 @@ def post_view(request, username, post_id):
     post = get_object_or_404(Post, author__username=username, id=post_id)
     author_posts_cnt = post.author.posts.count()
     comment_form = CommentForm()
+    # Pytest хочет комментарии.
+    comments = post.comments.all()
     additional_context = make_context(
         count_followings=True,
         count_author_posts=True,
@@ -186,6 +187,7 @@ def post_view(request, username, post_id):
         "post.html",
         {
             "post": post,
+            "comments": comments,
             "author": post.author,
             "form": comment_form,
             "additional_context": additional_context,
