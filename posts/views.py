@@ -15,11 +15,12 @@ from posts.models import Comment, Follow, Group, Post, User
 
 # Идея казалась хорошей, пока я не воплотил её
 # в какого-то монстра Франкенштейна.
+# Даже не знаю как это исправить.
 # Извиняюсь за никакой английский.
-def check_states(**kwargs):
+def make_context(**kwargs):
     """ Can use this function to make additional context.
     
-    Function returns dict "result_all_checks", values of this dict
+    Function returns dict "another_context", values of this dict
     are different objects for make context.
 
     Available keyword arguments:
@@ -48,18 +49,18 @@ def check_states(**kwargs):
     followings, second with number of followers.
 
     """
-    result_all_checks = {}
+    another_context = {}
     if "post" in kwargs:
         post = kwargs["post"]
         post_comments = post.comments.all()
         post_comments_cnt = post.comments.count()
-        result_all_checks["post_comments"] = post_comments
-        result_all_checks["post_comments_cnt"] = post_comments_cnt
+        another_context["post_comments"] = post_comments
+        another_context["post_comments_cnt"] = post_comments_cnt
 
     if "count_author_posts" in kwargs:
         author = kwargs["author"]
         author_posts_cnt = author.posts.count()
-        result_all_checks["author_posts_cnt"] = author_posts_cnt
+        another_context["author_posts_cnt"] = author_posts_cnt
 
     if "count_comments" in kwargs:
         posts = kwargs["count_comments"]
@@ -72,13 +73,13 @@ def check_states(**kwargs):
         for post_comments in all_comments:
             total_comments[post_comments["post"]] = post_comments["total"]
 
-        result_all_checks["total_comments"] = total_comments
+        another_context["total_comments"] = total_comments
 
     if "is_editable" in kwargs:
         user = kwargs["user"]
         author = kwargs["author"]
         can_edit = bool(user.is_authenticated and user == author)
-        result_all_checks["editable"] = can_edit
+        another_context["editable"] = can_edit
 
     if "is_following" in kwargs:
         user = kwargs["user"]
@@ -87,16 +88,16 @@ def check_states(**kwargs):
             user.is_authenticated
             and Follow.objects.filter(author=author, user=user).exists()
         )
-        result_all_checks["following"] = following
+        another_context["following"] = following
 
     if "count_followings" in kwargs:
         author = kwargs["author"]
         following = author.following.count()
         follower = author.follower.count()
-        result_all_checks["following_count"] = following
-        result_all_checks["follower_count"] = follower
+        another_context["following_count"] = following
+        another_context["follower_count"] = follower
 
-    return result_all_checks
+    return another_context
 
 
 @cache_page(20, key_prefix="index_page")
@@ -105,7 +106,7 @@ def index(request):
     paginator = Paginator(post_list, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
-    additional_context = check_states(count_comments=page)
+    additional_context = make_context(count_comments=page)
     return render(
         request,
         "index.html",
@@ -127,7 +128,7 @@ def follow_index(request):
     paginator = Paginator(favorites_authors_posts, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
-    additional_context = check_states(count_comments=page)
+    additional_context = make_context(count_comments=page)
 
     return render(
         request,
@@ -146,7 +147,7 @@ def profile(request, username):
     paginator = Paginator(author_posts, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
-    additional_context = check_states(
+    additional_context = make_context(
         count_followings=True,
         count_author_posts=True,
         is_following=True,
@@ -171,7 +172,7 @@ def post_view(request, username, post_id):
     post = get_object_or_404(Post, author__username=username, id=post_id)
     author_posts_cnt = post.author.posts.count()
     comment_form = CommentForm()
-    additional_context = check_states(
+    additional_context = make_context(
         count_followings=True,
         count_author_posts=True,
         is_following=True,
@@ -198,7 +199,7 @@ def group_posts(request, slug):
     paginator = Paginator(posts_in_group, 10)
     page_number = request.GET.get("page")
     page = paginator.get_page(page_number)
-    additional_context = check_states(count_comments=page)
+    additional_context = make_context(count_comments=page)
     return render(
         request,
         "group.html",
