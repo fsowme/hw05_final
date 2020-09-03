@@ -25,16 +25,16 @@
                     {% if post.comments.exists %}
 
                     {% if page %}
-                    {{ additional_context.total_comments|get_value_from_dict:post.id }} комментариев
+                    {{ comments_on_page|get_value_from_dict:post.id }} комментариев
                     {% else %}
-                    {{ additional_context.post_comments_cnt }} комментариев
+                    {{ comments_cnt }} комментариев
                     {% endif %}
 
                     {% else%}
                     Добавить комментарий
                     {% endif %}
                 </a>
-                {% if additional_context.editable %}
+                {% if can_edit %}
                 <a class="btn btn-sm text-muted" href="{% url 'post_edit' post.author.username post.id %}"
                     role="button">
                     Редактировать

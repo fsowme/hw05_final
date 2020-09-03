@@ -9,7 +9,7 @@ from PIL import Image
 from posts.models import Follow, Group, Post, User
 
 
-def make_post_with_image(self):
+def make_post_with_image(self, just_image=False):
     container_for_img = BytesIO()
     img = Image.new("RGB", (100, 100), "red")
     img.save(container_for_img, format="JPEG")
@@ -17,6 +17,8 @@ def make_post_with_image(self):
     img = SimpleUploadedFile(
         name="test_image.jpg", content=bin_image, content_type="image/jpg"
     )
+    if just_image:
+        return img
     post = Post.objects.create(
         author=self.user, text="testtext", image=img, group=self.group
     )
@@ -48,11 +50,14 @@ class TestPostsApp(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_createpost_auth(self):
+        img = make_post_with_image(self, just_image=True)
         response = self.cl_auth.post(
-            reverse("new_post"), {"text": "MyTestText2"}, follow=True
+            reverse("new_post"),
+            {"text": "MyTestText2", "image": img},
+            follow=True,
         )
-        post_id = response.context["page"].object_list[0].id
-        self.assertIsNotNone(Post.objects.get(id=post_id))
+        image_in_post = response.context["page"].object_list[0].image
+        self.assertTrue(image_in_post)
 
     def test_createpost_guest(self):
         response = self.cl.post(reverse("new_post"), {"text": "MyTestText"},)
@@ -178,8 +183,10 @@ class TestPostsApp(TestCase):
         author = User.objects.create_user(
             "seconduser", "su@test.ru", "seconduserpass"
         )
+        Follow.objects.create(author=author, user=self.user)
+
         self.cl_auth.post(
-            reverse("profile_unfollow", kwargs={"username": "mytestauthor"})
+            reverse("profile_unfollow", kwargs={"username": "seconduser"})
         )
         self.assertFalse(
             Follow.objects.filter(author=author, user=self.user).exists(),
