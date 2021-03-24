@@ -60,7 +60,10 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "yatube.urls"
-TEMPLATES_DIR = os.path.join(BASE_DIR, "templates",)
+TEMPLATES_DIR = os.path.join(
+    BASE_DIR,
+    "templates",
+)
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -146,5 +149,7 @@ EMAIL_FILE_PATH = os.path.join(BASE_DIR, "sent_emails")
 SITE_ID = 1
 
 CACHES = {
-    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache",}
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
 }

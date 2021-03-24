@@ -28,7 +28,6 @@ urlpatterns = [
     path("about/", include("django.contrib.flatpages.urls")),
     path("auth/", include("users.urls")),
     path("auth/", include("django.contrib.auth.urls")),
-    path("", include("posts.urls")),
 ]
 
 urlpatterns += [
@@ -46,13 +45,9 @@ urlpatterns += [
         {"url": "/about-spec/"},
         name="about-spec",
     ),
+    path("", include("posts.urls")),
 ]
 
 if settings.DEBUG:
-    urlpatterns += static(
-        settings.MEDIA_URL, document_root=settings.MEDIA_ROOT
-    )
-    urlpatterns += static(
-        settings.STATIC_URL, document_root=settings.STATIC_ROOT
-    )
-
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

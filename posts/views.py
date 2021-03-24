@@ -1,14 +1,8 @@
-from datetime import datetime as dt
-from itertools import chain
-from operator import attrgetter
-
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count
-from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template import Context
-from django.urls import reverse
 from django.views.decorators.cache import cache_page
 
 from posts.forms import CommentForm, NewPostForm
@@ -16,9 +10,6 @@ from posts.models import Comment, Follow, Group, Post, User
 
 context = Context()
 
-# Я правда хотел вернуть как было.
-# Но начал писать и не смог остановиться.
-# Надеюсь в этот раз лучше.
 def make_paginator(request, posts, total_on_page):
     paginator = Paginator(posts, total_on_page)
     page_number = request.GET.get("page")
@@ -70,9 +61,7 @@ def index(request):
 
 @login_required
 def follow_index(request):
-    favorites_authors_posts = Post.objects.filter(
-        author__following__user=request.user
-    )
+    favorites_authors_posts = Post.objects.filter(author__following__user=request.user)
     paginator, page = make_paginator(request, favorites_authors_posts, 10)
     context = {"page": page, "paginator": paginator}
     context.update(count_comments_on_page(page))

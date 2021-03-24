@@ -26,7 +26,9 @@ class NewPostForm(ModelForm):
             return data
         avail_group = Group.objects.filter(title=data).exists()
         if avail_group is not True:
-            raise forms.ValidationError("Такой группы еще нет",)
+            raise forms.ValidationError(
+                "Такой группы еще нет",
+            )
         return data
 
 
@@ -36,4 +38,3 @@ class CommentForm(ModelForm):
         fields = ["text"]
         labels = {"text": "Комментария"}
         help_texts = {"text": "Введите текст комментария"}
-

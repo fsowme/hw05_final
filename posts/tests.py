@@ -27,9 +27,7 @@ def make_post_with_image(self, just_image=False):
 
 class TestPostsApp(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
-            "mytestuser", "test@test.ru", "mytestpass"
-        )
+        self.user = User.objects.create_user("mytestuser", "test@test.ru", "mytestpass")
         self.group = Group.objects.create(
             slug="testslug", title="mytestgroup", description="testdescr"
         )
@@ -44,9 +42,7 @@ class TestPostsApp(TestCase):
         cache.clear()
 
     def test_profile_page(self):
-        response = self.cl.get(
-            reverse("profile", kwargs={"username": "mytestuser"})
-        )
+        response = self.cl.get(reverse("profile", kwargs={"username": "mytestuser"}))
         self.assertEqual(response.status_code, 200)
 
     def test_createpost_auth(self):
@@ -60,7 +56,10 @@ class TestPostsApp(TestCase):
         self.assertTrue(image_in_post)
 
     def test_createpost_guest(self):
-        response = self.cl.post(reverse("new_post"), {"text": "MyTestText"},)
+        response = self.cl.post(
+            reverse("new_post"),
+            {"text": "MyTestText"},
+        )
         self.assertRedirects(response, reverse("login") + "?next=/new/")
 
     def test_newpost_index(self):
@@ -68,9 +67,7 @@ class TestPostsApp(TestCase):
         self.assertContains(response, self.post)
 
     def test_newpost_profile(self):
-        response = self.cl.get(
-            reverse("profile", kwargs={"username": "mytestuser"})
-        )
+        response = self.cl.get(reverse("profile", kwargs={"username": "mytestuser"}))
         self.assertContains(response, self.post)
 
     def test_newpost_post(self):
@@ -81,9 +78,7 @@ class TestPostsApp(TestCase):
 
     def test_can_edit_post(self):
         response = self.cl_auth.post(
-            reverse(
-                "post_edit", kwargs={"username": "mytestuser", "post_id": 1}
-            ),
+            reverse("post_edit", kwargs={"username": "mytestuser", "post_id": 1}),
             {"text": "MyTestText2"},
         )
         self.post = Post.objects.get(id=1)
@@ -98,9 +93,7 @@ class TestPostsApp(TestCase):
     def test_editpost_profile(self):
         self.post.text = "MyTestText2"
         self.post.save()
-        response = self.cl.get(
-            reverse("profile", kwargs={"username": "mytestuser"})
-        )
+        response = self.cl.get(reverse("profile", kwargs={"username": "mytestuser"}))
         self.assertContains(response, self.post.text)
 
     def test_editpost_post(self):
@@ -121,7 +114,8 @@ class TestPostsApp(TestCase):
         post = make_post_with_image(self)
         response = self.cl.get(
             reverse(
-                "post", kwargs={"username": "mytestuser", "post_id": post.id},
+                "post",
+                kwargs={"username": "mytestuser", "post_id": post.id},
             )
         )
         self.assertIn("img", response.content.decode())
@@ -133,9 +127,7 @@ class TestPostsApp(TestCase):
 
     def test_profilepage_with_image(self):
         make_post_with_image(self)
-        response = self.cl.get(
-            reverse("profile", kwargs={"username": "mytestuser"})
-        )
+        response = self.cl.get(reverse("profile", kwargs={"username": "mytestuser"}))
         self.assertIn("img", response.content.decode())
 
     def test_grouppage_with_image(self):
@@ -145,7 +137,8 @@ class TestPostsApp(TestCase):
 
     def test_upload_not_image(self):
         text_file = SimpleUploadedFile(
-            name="textfile.txt", content=b"TestTextInFile",
+            name="textfile.txt",
+            content=b"TestTextInFile",
         )
         response = self.cl_auth.post(
             reverse(
@@ -163,16 +156,15 @@ class TestPostsApp(TestCase):
             "поврежден или не является изображением."
         )
         self.assertFormError(
-            response, "form", "image", errors=error_mesage,
+            response,
+            "form",
+            "image",
+            errors=error_mesage,
         )
 
     def test_auth_user_follow(self):
-        author = User.objects.create_user(
-            "seconduser", "su@test.ru", "seconduserpass"
-        )
-        self.cl_auth.post(
-            reverse("profile_follow", kwargs={"username": "seconduser"})
-        )
+        author = User.objects.create_user("seconduser", "su@test.ru", "seconduserpass")
+        self.cl_auth.post(reverse("profile_follow", kwargs={"username": "seconduser"}))
 
         self.assertTrue(
             Follow.objects.filter(author=author, user=self.user).exists(),
@@ -180,9 +172,7 @@ class TestPostsApp(TestCase):
         )
 
     def test_auth_user_unfollow(self):
-        author = User.objects.create_user(
-            "seconduser", "su@test.ru", "seconduserpass"
-        )
+        author = User.objects.create_user("seconduser", "su@test.ru", "seconduserpass")
         Follow.objects.create(author=author, user=self.user)
 
         self.cl_auth.post(
@@ -194,9 +184,7 @@ class TestPostsApp(TestCase):
         )
 
     def test_follower_sees_post(self):
-        author = User.objects.create_user(
-            "seconduser", "su@test.ru", "seconduserpass"
-        )
+        author = User.objects.create_user("seconduser", "su@test.ru", "seconduserpass")
         author_post = Post.objects.create(text="testtext", author=author)
 
         Follow.objects.create(author=author, user=self.user)
@@ -204,9 +192,7 @@ class TestPostsApp(TestCase):
         self.assertContains(follower_response, author_post)
 
     def test_not_follower_sees_post(self):
-        author = User.objects.create_user(
-            "seconduser", "su@test.ru", "seconduserpass"
-        )
+        author = User.objects.create_user("seconduser", "su@test.ru", "seconduserpass")
         author_post = Post.objects.create(text="testtext", author=author)
 
         not_follower_response = self.cl_auth.get(reverse("follow_index"))
@@ -225,9 +211,7 @@ class TestPostsApp(TestCase):
 
     def test_authuser_can_comment(self):
         response = self.cl_auth.post(
-            reverse(
-                "add_comment", kwargs={"username": "mytestuser", "post_id": 1}
-            ),
+            reverse("add_comment", kwargs={"username": "mytestuser", "post_id": 1}),
             {"text": "TestComment"},
             follow=True,
         )
@@ -236,9 +220,7 @@ class TestPostsApp(TestCase):
 
 class TestCache(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
-            "mytestuser", "test@test.ru", "mytestpass"
-        )
+        self.user = User.objects.create_user("mytestuser", "test@test.ru", "mytestpass")
         self.cl = Client()
 
     def test_post_in_index(self):
